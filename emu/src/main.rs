@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::env;
 use std::fs;
-use std::collections::HashSet;
+use std::time::{Duration, Instant};
 
 use minifb::{Key, Window, WindowOptions};
 use core::Core;
@@ -9,6 +9,11 @@ use core::Core;
 const WIDTH: usize = 640;
 const HEIGHT: usize = 320;
 
+const FPS: usize = 60;
+const CPS: usize = 660;
+
+const TIMER_FREQUENCY: u64 = 60;
+const TIMER_PERIOD: Duration = Duration::from_nanos((1_000_000_000) / TIMER_FREQUENCY);
 
 fn get_program(args: &[String]) -> Result<Vec<u8>, Box<dyn Error>> {
     if args.len() < 2 {
@@ -53,35 +58,40 @@ fn keymap(key: &Key) -> Option<u8> {
     Some(translated)
 }
 
-fn keys_to_set(keys_pressed: Vec<Key>) -> HashSet<u8> {
-    // Creates a set of keys pressed from the vector
-    HashSet::from_iter(keys_pressed.iter().filter_map(|x| keymap(x)))
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let program = get_program(&args)?;
+    let legacy_mode = args.iter().any(|arg| arg == "--legacy");
 
-    let mut core = Core::new();
-
-    core.load_rom(&program);
-
+    let mut core = Core::new(&program, legacy_mode);
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
-    //core.decode_and_exec(0x8111);
-
     let mut window = Window::new(
-        "Test - ESC to exit",
+        "Chip8 emulator - ESC to exit",
         WIDTH,
         HEIGHT,
         WindowOptions::default(),
     )?;
 
-    window.set_target_fps(60);
-
+    let mut prev_time = Instant::now();
+    
+    window.set_target_fps(FPS);
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        //let a = window.get_keys_pressed(minifb::KeyRepeat::Yes);
-        core.cycle();
+        let cycles_per_frame = CPS / FPS;
+        let all_keys_pressed = window.get_keys_pressed(minifb::KeyRepeat::Yes);
+        let keys: Vec<u8> = all_keys_pressed
+            .iter()
+            .filter_map(|x| keymap(x))
+            .collect();
+
+        for _ in 0..cycles_per_frame {
+            let now = Instant::now();
+            if now - prev_time >= TIMER_PERIOD {
+                core.decrement_timers();
+                prev_time = now;
+            }
+            core.cycle(&keys);
+        }
         write_to_buffer(&core.display, &mut buffer);
         window.update_with_buffer(&buffer, WIDTH, HEIGHT)?;
     }
