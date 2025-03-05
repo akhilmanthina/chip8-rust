@@ -71,6 +71,10 @@ impl Core {
         if self.s_timer > 0 {self.s_timer -= 1};
     }
 
+    pub fn sound_active(&self) -> bool {
+        self.s_timer > 0
+    }
+
     pub fn cycle(&mut self, keys: &[u8]) {
         let instruction = self.fetch();
         self.decode_and_exec(instruction, keys);

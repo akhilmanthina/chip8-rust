@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 minifb = "0.28.0"
 core = { path = "../core" }
+rodio = "0.20.1"

@@ -19,7 +19,7 @@ To add additional games and programs, drop the ROMs into the folder ```roms/```
 
 - Event based input handling to hopefully improve responsiveness
 - Support for more ambiguous instructions
-- Audio support
+- ~~Audio support~~
 
 ## License
 

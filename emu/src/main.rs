@@ -1,9 +1,12 @@
 use std::error::Error;
 use std::env;
 use std::fs;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use minifb::{Key, Window, WindowOptions};
+use rodio::{OutputStream, Sink};
+use rodio::source::{SineWave, Source};
 use core::Core;
 
 const WIDTH: usize = 640;
@@ -14,6 +17,9 @@ const CPS: usize = 660;
 
 const TIMER_FREQUENCY: u64 = 60;
 const TIMER_PERIOD: Duration = Duration::from_nanos((1_000_000_000) / TIMER_FREQUENCY);
+
+const AUDIO_FREQ: f32 = 440.0;
+const AUDIO_VOL: f32 = 0.2;
 
 fn get_program(args: &[String]) -> Result<Vec<u8>, Box<dyn Error>> {
     if args.len() < 2 {
@@ -58,6 +64,8 @@ fn keymap(key: &Key) -> Option<u8> {
     Some(translated)
 }
 
+
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let program = get_program(&args)?;
@@ -74,7 +82,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let mut prev_time = Instant::now();
-    
+
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
+
+    let source = SineWave::new(AUDIO_FREQ).amplify(AUDIO_VOL);
+    sink.append(source);
+
     window.set_target_fps(FPS);
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let cycles_per_frame = CPS / FPS;
@@ -88,8 +102,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             let now = Instant::now();
             if now - prev_time >= TIMER_PERIOD {
                 core.decrement_timers();
+
                 prev_time = now;
             }
+            if core.sound_active() { sink.play(); } else { sink.pause(); }
             core.cycle(&keys);
         }
         write_to_buffer(&core.display, &mut buffer);
